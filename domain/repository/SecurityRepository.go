@@ -20,3 +20,14 @@ func GetUserByPhone(phone string) (*m.User, interface{}) {
 	}
 	return &user, nil
 }
+
+func GetUserByMail(email string) (*m.User, error) {
+	var user m.User
+	db := config.DB
+	result := db.Preload("Providers").Preload("Roles", "is_deleted = ? ", false).Where("email = ? ", email).
+		Where("is_deleted = ?", false).First(&user)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &user, nil
+}
