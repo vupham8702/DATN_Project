@@ -8,7 +8,8 @@ import (
 func SecurityRouter(routerGroup *gin.RouterGroup) {
 	securityGroup := routerGroup.Group("/security")
 	{
-		//securityGroup.POST("/register", controller.Register)
+		securityGroup.POST("/register", controller.Register)
+		securityGroup.POST("/verify-email", controller.VerifyEmail)
 		//securityGroup.PATCH("/sms/reset-password", controller.ResetPasswordSms)
 		securityGroup.POST("/login", controller.Login)
 		//securityGroup.POST("/guest/login", controller.GuestLogin)

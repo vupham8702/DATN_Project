@@ -10,4 +10,8 @@ type UserProvider struct {
 	AppleId          string `json:"apple_id"`
 	UserType         string `json:"user_type"`
 	ProviderIdentify string `json:"provider_identify"`
+	IsApproved       bool   `json:"is_approved"`   // For employer accounts
+	ApprovedBy       uint   `json:"approved_by"`   // ID of admin who approved
+	ApprovalNote     string `json:"approval_note"` // Note from admin
+	ReceivedNoti     bool   `json:"received_noti"`
 }
