@@ -17,12 +17,13 @@ import (
 
 var SECRET_KEY = os.Getenv("SECRET_KEY")
 
-func GenerateToken(uid uint, issupper bool, roles interface{}, userType string) response.UserToken {
+func GenerateToken(uid uint, issupper bool, roles interface{}, userType string, deviceId string) response.UserToken {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"uid":      fmt.Sprintf("%d", uid),
 		"issupper": issupper,
 		"roles":    roles,
 		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		"deviceid": deviceId,
 		"type":     userType,
 	})
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{

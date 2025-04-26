@@ -25,11 +25,10 @@ const (
 	LOCK_USER_ACTION    = "Khóa người dùng"
 	SmsInit             = "init"
 	SmsVerify           = "verify"
-	USER_TYPE_CMS       = "CMS"
-	USER_TYPE_MOBILE    = "MOBILE"
+	USER_TYPE_EMPLOYER  = "EMPLOYER"
+	USER_TYPE_JOBSEEKER = "JOBSEEKER"
 	USER_TYPE_ANONYMOUS = "ANONYMOUS"
-
-	PROVIDER_PHONE = "PHONE"
+	USER_TYPE_SYSTEM    = "SYSTEM"
 
 	FIREBASE_SIGNIN_PROVIDER_APPLE  = "apple.com"
 	FIREBASE_SIGNIN_PROVIDER_GOOGLE = "google.com"

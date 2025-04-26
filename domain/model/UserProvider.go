@@ -7,7 +7,6 @@ type UserProvider struct {
 	UserID           uint   `json:"gorm:not null"`
 	User             User   `gorm:"constraint:OnDelete:CASCADE;"`
 	Provider         string `gorm:"not null"`
-	AppleId          string `json:"apple_id"`
 	UserType         string `json:"user_type"`
 	ProviderIdentify string `json:"provider_identify"`
 	IsApproved       bool   `json:"is_approved"`   // For employer accounts

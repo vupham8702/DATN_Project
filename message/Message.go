@@ -21,13 +21,13 @@ var (
 	FieldNotExist       = Message{Code: 500, Message: "Trường dữ liệu không tồn tại!"}
 	ExcuteDatabaseError = Message{Code: 500, Message: "Thao tác với CSDL thất bại!"}
 	TooManyRequests     = Message{Code: 429, Message: "Quá nhiều yêu cầu. Vui lòng thử lại sau."}
-
+	RoleNotFound        = Message{Code: 400, Message: "Vai trò không tồn tại!"}
+	ForbidenError       = Message{Code: 403, Message: "Bạn không có quyền thực hiện thao tác này"}
 	// Registration messages
 	EmailAlreadyExists     = Message{Code: 400, Message: "Email này đã được đăng ký"}
 	RegistrationSuccess    = Message{Code: 200, Message: "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản."}
 	InvalidVerifyToken     = Message{Code: 400, Message: "Link xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng ký lại."}
 	EmailVerifySuccess     = Message{Code: 200, Message: "Email đã được xác thực thành công. Bạn có thể đăng nhập ngay bây giờ."}
-	EmailNotVerified       = Message{Code: 400, Message: "Vui lòng xác thực email trước khi đăng nhập."}
 	PasswordRequirements   = Message{Code: 400, Message: "Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt."}
 	EmailExistsNotVerified = Message{Code: 409, Message: "Email này đã được đăng ký nhưng chưa xác thực. Vui lòng kiểm tra email hoặc yêu cầu gửi lại email xác thực."}
 	VerificationEmailSent  = Message{Code: 200, Message: "Email xác thực đã được gửi lại. Vui lòng kiểm tra hộp thư của bạn."}

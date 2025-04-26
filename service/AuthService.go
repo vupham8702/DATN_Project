@@ -38,12 +38,6 @@ func Login(c *gin.Context, userLogin *payload.UserLogin, deviceId string) (*resp
 		return nil, message.EmailNotExist
 	}
 
-	// Check if email is verified
-	if user.IsActive == false {
-		middleware.Log(fmt.Sprintf("Login failed: Email not verified: %s", email))
-		return nil, message.EmailNotVerified
-	}
-
 	if user.IsLocked == true {
 		middleware.Log(fmt.Sprintf("Login failed: Account locked: %s", email))
 		return nil, message.UserHasBeenLocked
@@ -61,9 +55,8 @@ func Login(c *gin.Context, userLogin *payload.UserLogin, deviceId string) (*resp
 		middleware.Log(fmt.Sprintf("Login failed: Incorrect password for email: %s", email))
 		return nil, message.PasswordNotCorrect
 	}
-	userType := repo.GetUserProviderByUserID(&user)
 
-	token, tokenErr := CreateToken(c, &user, userType)
+	token, tokenErr := CreateToken(c, &user, provider.UserType, deviceId)
 	if tokenErr != nil {
 		middleware.Log(fmt.Errorf("Failed to create token for user %s: %v", email, tokenErr))
 		return nil, tokenErr
@@ -75,7 +68,7 @@ func Login(c *gin.Context, userLogin *payload.UserLogin, deviceId string) (*resp
 	return token, nil
 }
 
-func CreateToken(c *gin.Context, user *model.User, userType string) (*response.UserToken, interface{}) {
+func CreateToken(c *gin.Context, user *model.User, userType string, deviceId string) (*response.UserToken, interface{}) {
 	var roles []string
 
 	for _, role := range user.Roles {
@@ -87,9 +80,10 @@ func CreateToken(c *gin.Context, user *model.User, userType string) (*response.U
 		user.IsSupper,
 		roles,
 		userType,
+		deviceId,
 	)
 	uidStr := fmt.Sprintf("%d", user.ID)
-	errSaveToken := CreateTokenRedis(c, &token, uidStr)
+	errSaveToken := CreateTokenRedis(c, &token, uidStr, deviceId)
 	if errSaveToken != nil {
 		return nil, message.ExcuteDatabaseError
 	}
@@ -97,8 +91,8 @@ func CreateToken(c *gin.Context, user *model.User, userType string) (*response.U
 	return &token, nil
 }
 
-func CreateTokenRedis(c *gin.Context, token *response.UserToken, uid string) interface{} {
-	key := config.TOKEN + ":" + uid
+func CreateTokenRedis(c *gin.Context, token *response.UserToken, uid string, deviceId string) interface{} {
+	key := config.TOKEN + ":" + uid + ":" + deviceId
 	value, err := json.Marshal(token)
 	if err != nil {
 		return message.InternalServerError
@@ -113,6 +107,7 @@ func CreateTokenRedis(c *gin.Context, token *response.UserToken, uid string) int
 
 // Register handles user registration
 func Register(c *gin.Context, userRegister *payload.UserRegister) (interface{}, interface{}) {
+	tx := config.DB.Begin()
 	// Normalize email (convert to lowercase)
 	email := strings.ToLower(strings.TrimSpace(userRegister.Email))
 
@@ -138,6 +133,21 @@ func Register(c *gin.Context, userRegister *payload.UserRegister) (interface{}, 
 		return nil, message.Message{Message: "Invalid user type. Must be 'jobseeker' or 'employer'", Code: 400}
 	}
 
+	defaultRole, errRole := repo.GetRoleByName(config.DB, config.DEFAULT_USER_PERMISSION)
+	if errRole != nil {
+		return nil, defaultRole
+	}
+	roles := []*model.Role{defaultRole}
+	for _, rdto := range userRegister.Roles {
+		extraRole, err := repo.GetRoleByID(tx, rdto.Id)
+		if err != nil {
+			tx.Rollback()
+			return nil, message.RoleNotFound
+		}
+		if extraRole.ID != defaultRole.ID {
+			roles = append(roles, extraRole)
+		}
+	}
 	// Create new user with more default values
 	user := model.User{
 		Username:  email,
@@ -147,6 +157,7 @@ func Register(c *gin.Context, userRegister *payload.UserRegister) (interface{}, 
 		IsActive:  false, // Not active until email is verified
 		IsSupper:  false,
 		IsLocked:  false,
+		Roles:     roles,
 	}
 
 	// Save user to database using repository function
@@ -174,110 +185,91 @@ func Register(c *gin.Context, userRegister *payload.UserRegister) (interface{}, 
 	}
 
 	// Log successful registration
-	middleware.Log(fmt.Sprintf("User registered successfully: %s (ID: %d, Type: %s)", email, user.ID, userRegister.UserType))
+	middleware.Log(fmt.Sprintf("User registered successfully: %s (ID: %d, Type: %s, Role: DEFAULT_USER)", email, user.ID, userRegister.UserType))
 
 	return user, nil
 }
 
-// VerifyEmail verifies a user's email using the token
-func VerifyEmail(c *gin.Context, verifyEmail *payload.VerifyEmail) (interface{}, interface{}) {
-	// Normalize email
-	email := strings.ToLower(strings.TrimSpace(verifyEmail.Email))
+// ApproveEmployer handles the approval or rejection of an employer account
+func ApproveEmployer(c *gin.Context, approveRequest *payload.ApproveEmployer, adminID *uint) (interface{}, interface{}) {
+	// Get the user by ID
+	var user model.User
+	if err := config.DB.First(&user, approveRequest.UserID).Error; err != nil {
+		middleware.Log(fmt.Errorf("User not found: %v", err))
+		return nil, message.UserNotFound
+	}
 
-	// Log verification attempt
-	middleware.Log(fmt.Sprintf("Email verification attempt for: %s", email))
-
-	// Get token from Redis with timeout context
-	ctx, cancel := context.WithTimeout(c, 5*time.Second)
-	defer cancel()
-
-	key := fmt.Sprintf("email_verification:%s", email)
-	storedToken, err := config.RedisClient.Get(ctx, key).Result()
-
+	// Get the user provider
+	userProvider, err := repo.GetUserProviderByUserID(&user)
 	if err != nil {
-		middleware.Log(fmt.Errorf("Verification failed: Token not found for email %s: %v", email, err))
-		return nil, message.InvalidVerifyToken
+		middleware.Log(fmt.Errorf("User provider not found: %v", err))
+		return nil, message.Message{Message: "Không tìm thấy thông tin tài khoản", Code: 404}
 	}
 
-	if storedToken != verifyEmail.Token {
-		middleware.Log(fmt.Sprintf("Verification failed: Token mismatch for email %s", email))
-		return nil, message.InvalidVerifyToken
+	// Check if this is actually an employer account
+	if userProvider.UserType != config.USER_TYPE_EMPLOYER {
+		return nil, message.Message{Message: "Tài khoản này không phải tài khoản của nhà tuyển dụng", Code: 400}
 	}
 
-	// Find user by email
-	user, err := repo.GetUserByMail(email)
+	// Check if already approved
+	if userProvider.IsApproved {
+		return nil, message.Message{Message: "Tài khoản này đã được kiểm duyệt", Code: 400}
+	}
+
+	// Process approval/rejection
+	isApproved := approveRequest.Status == "approved"
+	err = repo.UpdateUserProviderApprovalStatus(userProvider.ID, isApproved, adminID, approveRequest.Note)
 	if err != nil {
-		middleware.Log(fmt.Errorf("Verification failed: User not found for email %s: %v", email, err))
-		return nil, message.EmailNotExist
+		middleware.Log(fmt.Errorf("Failed to update approval status: %v", err))
+		return nil, message.InternalServerError
 	}
 
-	// Update user to active using repository function
-	if err := repo.UpdateUserActiveStatus(user, true); err != nil {
-		middleware.Log(fmt.Errorf("Failed to update user status: %v", err))
-		return nil, message.ExcuteDatabaseError
+	// Prepare notification to the user
+	// TODO: Send email notification to the user about approval status
+
+	if isApproved {
+		return map[string]interface{}{
+			"message": "Employer account has been approved",
+			"userId":  user.ID,
+		}, nil
+	} else {
+		return map[string]interface{}{
+			"message": "Employer account has been rejected",
+			"userId":  user.ID,
+		}, nil
 	}
-
-	// Delete token from Redis
-	config.RedisClient.Del(ctx, key)
-
-	// Log successful verification
-	middleware.Log(fmt.Sprintf("Email verified successfully for: %s (ID: %d)", email, user.ID))
-
-	return message.EmailVerifySuccess, nil
 }
 
-// UpdateUserProviderApprovalStatus updates the approval status of a user provider
-func UpdateUserProviderApprovalStatus(userProviderID uint, isApproved bool, approvedBy uint, note string) error {
+// GetPendingEmployers retrieves all employer accounts pending approval
+func GetPendingEmployers() (interface{}, interface{}) {
+	var userProviders []model.UserProvider
 	db := config.DB
-	tx := db.Begin()
-	if tx.Error != nil {
-		middleware.Log(fmt.Errorf("Failed to begin transaction: %v", tx.Error))
-		return tx.Error
+
+	// Get all user providers that are employer type and not approved
+	result := db.Where("user_type = ? AND is_approved = ?", "employer", false).
+		Preload("User"). // Load associated user information
+		Find(&userProviders)
+
+	if result.Error != nil {
+		middleware.Log(fmt.Errorf("Failed to retrieve pending employers: %v", result.Error))
+		return nil, message.InternalServerError
 	}
 
-	// Find the user provider
-	var userProvider model.UserProvider
-	if err := tx.First(&userProvider, userProviderID).Error; err != nil {
-		tx.Rollback()
-		middleware.Log(fmt.Errorf("Failed to find user provider: %v", err))
-		return err
-	}
-
-	// Update approval status
-	userProvider.IsApproved = isApproved
-	userProvider.ApprovedBy = approvedBy
-	userProvider.ApprovalNote = note
-	if err := tx.Save(&userProvider).Error; err != nil {
-		tx.Rollback()
-		middleware.Log(fmt.Errorf("Failed to update user provider: %v", err))
-		return err
-	}
-
-	// If approved, also activate the user
-	if isApproved {
-		var user model.User
-		if err := tx.First(&user, userProvider.UserID).Error; err != nil {
-			tx.Rollback()
-			middleware.Log(fmt.Errorf("Failed to find user: %v", err))
-			return err
+	// Format data for response
+	var response []map[string]interface{}
+	for _, provider := range userProviders {
+		userData := map[string]interface{}{
+			"userId":     provider.UserID,
+			"email":      provider.Email,
+			"providerId": provider.ID,
+			"fullName":   provider.User.FirstName + " " + provider.User.LastName,
+			"createdAt":  provider.CreatedAt,
 		}
-
-		// Only activate if the email has been verified (check your logic here)
-		if user.IsActive {
-			user.IsLocked = false // Ensure the user is unlocked
-			if err := tx.Save(&user).Error; err != nil {
-				tx.Rollback()
-				middleware.Log(fmt.Errorf("Failed to update user: %v", err))
-				return err
-			}
-		}
+		response = append(response, userData)
 	}
 
-	// Commit the transaction
-	if err := tx.Commit().Error; err != nil {
-		middleware.Log(fmt.Errorf("Failed to commit transaction: %v", err))
-		return err
-	}
-
-	return nil
+	return map[string]interface{}{
+		"pendingEmployers": response,
+		"count":            len(response),
+	}, nil
 }

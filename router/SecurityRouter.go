@@ -2,6 +2,7 @@ package router
 
 import (
 	"datn_backend/controller"
+	"datn_backend/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -9,10 +10,10 @@ func SecurityRouter(routerGroup *gin.RouterGroup) {
 	securityGroup := routerGroup.Group("/security")
 	{
 		securityGroup.POST("/register", controller.Register)
-		securityGroup.POST("/verify-email", controller.VerifyEmail)
 		//securityGroup.PATCH("/sms/reset-password", controller.ResetPasswordSms)
 		securityGroup.POST("/login", controller.Login)
-		//securityGroup.POST("/guest/login", controller.GuestLogin)
+		securityGroup.POST("/approve-employer", middleware.Permission([]string{"ADMIN"}), controller.ApproveEmployer)
+		securityGroup.GET("/pending-employers", controller.GetPendingEmployers)
 		//securityGroup.GET("/logout", controller.Logout)
 		//securityGroup.POST("/refresh-token", controller.RefreshToken)
 		//securityGroup.POST("/forgot-password", controller.ForgotPassword)
