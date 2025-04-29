@@ -13,7 +13,7 @@ func SecurityRouter(routerGroup *gin.RouterGroup) {
 		//securityGroup.PATCH("/sms/reset-password", controller.ResetPasswordSms)
 		securityGroup.POST("/login", controller.Login)
 		securityGroup.POST("/approve-employer", middleware.Permission([]string{"ADMIN"}), controller.ApproveEmployer)
-		securityGroup.GET("/pending-employers", controller.GetPendingEmployers)
+		securityGroup.GET("/pending-employers", middleware.Permission([]string{"ADMIN"}), controller.GetPendingEmployers)
 		//securityGroup.GET("/logout", controller.Logout)
 		//securityGroup.POST("/refresh-token", controller.RefreshToken)
 		//securityGroup.POST("/forgot-password", controller.ForgotPassword)

@@ -12,12 +12,10 @@ type User struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	//Phone     string `json:"phone"`
-	Password  string `json:"password"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	IsSupper  bool   `json:"is_supper"`
-	IsActive  bool   `json:"is_active"`
-	Avatar    string `json:"avatar"`
+	Password string `json:"password"`
+	IsSupper bool   `json:"is_supper"`
+	IsActive bool   `json:"is_active"`
+	//Avatar    string `json:"avatar"`
 	//ResourceID   *uint           `json:"resource_id"`
 	//Resource     *Resource       `json:"resource"`
 	Roles     []*Role         `gorm:"many2many:user_role" json:"roles"`

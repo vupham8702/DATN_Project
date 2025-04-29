@@ -45,7 +45,7 @@ func Login(c *gin.Context, userLogin *payload.UserLogin, deviceId string) (*resp
 	provider := repo.GetUserProvider(user)
 
 	// Check if employer account is approved
-	if provider.UserType == "employer" && !provider.IsApproved {
+	if provider.UserType == config.USER_TYPE_EMPLOYER && !provider.IsApproved {
 		middleware.Log(fmt.Sprintf("Login failed: Employer account not approved yet: %s", email))
 		return nil, message.ApprovalAccountPenning
 	}
@@ -150,14 +150,13 @@ func Register(c *gin.Context, userRegister *payload.UserRegister) (interface{}, 
 	}
 	// Create new user with more default values
 	user := model.User{
-		Username:  email,
-		Email:     email,
-		FirstName: userRegister.FullName,
-		Password:  utils.HashPassword(userRegister.Password),
-		IsActive:  false, // Not active until email is verified
-		IsSupper:  false,
-		IsLocked:  false,
-		Roles:     roles,
+		Username: email,
+		Email:    email,
+		Password: utils.HashPassword(userRegister.Password),
+		IsActive: false, // Not active until email is verified
+		IsSupper: false,
+		IsLocked: false,
+		Roles:    roles,
 	}
 
 	// Save user to database using repository function
@@ -191,7 +190,7 @@ func Register(c *gin.Context, userRegister *payload.UserRegister) (interface{}, 
 }
 
 // ApproveEmployer handles the approval or rejection of an employer account
-func ApproveEmployer(c *gin.Context, approveRequest *payload.ApproveEmployer, adminID *uint) (interface{}, interface{}) {
+func ApproveEmployer(approveRequest *payload.ApproveEmployer, adminID *uint) (interface{}, interface{}) {
 	// Get the user by ID
 	var user model.User
 	if err := config.DB.First(&user, approveRequest.UserID).Error; err != nil {
@@ -240,36 +239,63 @@ func ApproveEmployer(c *gin.Context, approveRequest *payload.ApproveEmployer, ad
 	}
 }
 
-// GetPendingEmployers retrieves all employer accounts pending approval
-func GetPendingEmployers() (interface{}, interface{}) {
-	var userProviders []model.UserProvider
-	db := config.DB
+//// GetPendingEmployers retrieves all employer accounts pending approval
+//func GetPendingEmployers() (interface{}, interface{}) {
+//	var userProviders []model.UserProvider
+//	db := config.DB
+//
+//	// Get all user providers that are employer type and not approved
+//	result := db.Where("user_type = ? AND is_approved = ?", config.USER_TYPE_EMPLOYER, false).
+//		Preload("User"). // Load associated user information
+//		Find(&userProviders)
+//
+//	if result.Error != nil {
+//		middleware.Log(fmt.Errorf("Failed to retrieve pending employers: %v", result.Error))
+//		return nil, message.InternalServerError
+//	}
+//
+//	// Format data for response
+//	var response []map[string]interface{}
+//	for _, provider := range userProviders {
+//		userData := map[string]interface{}{
+//			"userId":     provider.UserID,
+//			"email":      provider.Email,
+//			"providerId": provider.ID,
+//			//"fullName":   provider.User.FirstName + " " + provider.User.LastName,
+//			"createdAt": provider.CreatedAt,
+//		}
+//		response = append(response, userData)
+//	}
+//
+//	return map[string]interface{}{
+//		"pendingEmployers": response,
+//		"count":            len(response),
+//	}, nil
+//}
 
-	// Get all user providers that are employer type and not approved
-	result := db.Where("user_type = ? AND is_approved = ?", "employer", false).
-		Preload("User"). // Load associated user information
-		Find(&userProviders)
+// GetPendingEmployers gets all employer accounts that are pending approval
+func GetPendingEmployers(c *gin.Context) (interface{}, interface{}) {
+	// Check if admin has permission
+	//adminUser, err := repo.GetUserById(adminID)
+	//if err != nil {
+	//	middleware.Log(fmt.Errorf("Admin user not found: %v", err))
+	//	return nil, message.UserNotFound
+	//}
+	//
+	//if !adminUser.IsSupper {
+	//	middleware.Log(fmt.Sprintf("Get pending employers attempt by non-admin user: %d", adminID))
+	//	return nil, message.Message{Message: "You don't have permission to view pending employer accounts", Code: 403}
+	//}
 
-	if result.Error != nil {
-		middleware.Log(fmt.Errorf("Failed to retrieve pending employers: %v", result.Error))
-		return nil, message.InternalServerError
-	}
-
-	// Format data for response
-	var response []map[string]interface{}
-	for _, provider := range userProviders {
-		userData := map[string]interface{}{
-			"userId":     provider.UserID,
-			"email":      provider.Email,
-			"providerId": provider.ID,
-			"fullName":   provider.User.FirstName + " " + provider.User.LastName,
-			"createdAt":  provider.CreatedAt,
-		}
-		response = append(response, userData)
+	// Get pending employer accounts
+	employers, err := repo.GetPendingEmployers()
+	if err != nil {
+		middleware.Log(fmt.Errorf("Failed to get pending employers: %v", err))
+		return nil, message.ExcuteDatabaseError
 	}
 
 	return map[string]interface{}{
-		"pendingEmployers": response,
-		"count":            len(response),
+		"pending_employers": employers,
+		"count":             len(employers),
 	}, nil
 }

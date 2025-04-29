@@ -20,6 +20,7 @@ func RegisterRoutes(router *gin.Engine) {
 		//UserRouter(prefixRoute)
 		//ContentRouter(prefixRoute)
 		SecurityRouter(prefixRoute)
+		ProfileRouter(prefixRoute)
 		//ResourceRouter(prefixRoute)
 		//PermissionRouter(prefixRoute)
 		//RoleRouter(prefixRoute)

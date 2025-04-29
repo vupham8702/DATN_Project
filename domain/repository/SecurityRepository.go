@@ -9,20 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetUserByPhone(phone string) (*m.User, interface{}) {
-	db := config.DB
-	var user m.User
-	result := db.Preload("Providers").
-		Preload("Roles", "is_deleted = ? ", false).
-		Where("phone = ? and is_active = ? and is_deleted = ?", phone, true, false).
-		First(&user)
-	if result.RowsAffected == 0 {
-		middleware.Log(result.Error)
-		return nil, message.UserNotFound
-	}
-	return &user, nil
-}
-
 func GetUserByMail(email string) (*m.User, error) {
 	var user m.User
 	db := config.DB
@@ -77,7 +63,6 @@ func CreateUser(user *m.User, userType string) error {
 	} else if userType == config.USER_TYPE_JOBSEEKER {
 		userProvider.IsApproved = true // Jobseeker doesn't need approval
 	}
-
 	if err := tx.Create(userProvider).Error; err != nil {
 		tx.Rollback()
 		middleware.Log(fmt.Errorf("Failed to create user provider: %v", err))
@@ -87,6 +72,21 @@ func CreateUser(user *m.User, userType string) error {
 	if err := tx.Commit().Error; err != nil {
 		middleware.Log(fmt.Errorf("Failed to commit transaction: %v", err))
 		return err
+	}
+	if userType == config.USER_TYPE_EMPLOYER {
+		employerProfile := m.EmployerProfile{
+			UserID: user.ID,
+		}
+		if err := CreateEmployerProfile(&employerProfile); err != nil {
+			middleware.Log(fmt.Errorf("Failed to create employer profile: %v", err))
+		}
+	} else if userType == config.USER_TYPE_JOBSEEKER {
+		jobseekerProfile := m.JobseekerProfile{
+			UserID: user.ID,
+		}
+		if err := CreateJobseekerProfile(&jobseekerProfile); err != nil {
+			middleware.Log(fmt.Errorf("Failed to create jobseeker profile: %v", err))
+		}
 	}
 
 	return nil

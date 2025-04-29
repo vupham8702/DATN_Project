@@ -88,19 +88,13 @@ CREATE TABLE "user" (
     is_supper bool default false,
     last_ip varchar(255) NULL,
     last_login timestamp(6) NULL,
-    avatar varchar(255) NULL,
     created_at timestamp(6) NULL,
     updated_at timestamp(6) NULL,
     deleted_at timestamp(6) NULL,
     created_by int8 NULL,
-    date_of_birth timestamp(6) NULL,
     updated_by int8 NULL,
     deleted_by int8 NULL,
-    age int4 NULL,
-    gender int4 NOT NULL DEFAULT 0,  -- Gender 1-Male 2-FeMale 3-Other
     is_deleted bool default false,
-    first_name varchar(255) NULL,
-    last_name varchar(255) NULL,
     is_active bool default true,
     is_locked bool default false,  -- Thêm cột is_locked
     CONSTRAINT user_pkey PRIMARY KEY (id)

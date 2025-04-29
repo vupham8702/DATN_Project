@@ -1,7 +1,6 @@
 package controller
 
 import (
-	m "datn_backend/domain/model"
 	"datn_backend/message"
 	"datn_backend/middleware"
 	"datn_backend/payload"
@@ -77,25 +76,20 @@ func Register(c *gin.Context) {
 // @Security BearerAuth
 func ApproveEmployer(c *gin.Context) {
 	// Check if the current user is an admin
-	//user, exists := c.Get("currentUser")
-	//if !exists || !user.(m.User).IsSupper {
-	//	response.Response(c, message.Message{Message: "Unauthorized access", Code: http.StatusUnauthorized})
-	//	return
-	//}
 	uid, errGet := utils.GetUidByClaim(c)
 	if errGet != nil {
 		response.Response(c, errGet)
 		return
 	}
-	isSupper, errSuper := utils.GetFieldInToken(c, "issupper")
-	if errSuper != nil {
-		response.Response(c, message.InternalServerError)
-		return
-	}
-	if *isSupper == "false" {
-		response.Response(c, message.Message{Message: "Unauthorized access", Code: http.StatusUnauthorized})
-		return
-	}
+	//isSupper, errSuper := utils.GetFieldInToken(c, "issupper")
+	//if errSuper != nil {
+	//	response.Response(c, message.InternalServerError)
+	//	return
+	//}
+	//if *isSupper == "false" {
+	//	response.Response(c, message.Message{Message: "Unauthorized access", Code: http.StatusUnauthorized})
+	//	return
+	//}
 
 	var approveRequest payload.ApproveEmployer
 	if err := c.ShouldBindJSON(&approveRequest); err != nil {
@@ -104,7 +98,7 @@ func ApproveEmployer(c *gin.Context) {
 		return
 	}
 
-	result, err := service.ApproveEmployer(c, &approveRequest, uid)
+	result, err := service.ApproveEmployer(&approveRequest, uid)
 	if err != nil {
 		response.Response(c, err)
 		return
@@ -123,14 +117,7 @@ func ApproveEmployer(c *gin.Context) {
 // @Router /datn_backend/security/pending-employers [get]
 // @Security BearerAuth
 func GetPendingEmployers(c *gin.Context) {
-	// Check if the current user is an admin
-	user, exists := c.Get("currentUser")
-	if !exists || !user.(m.User).IsSupper {
-		response.Response(c, message.Message{Message: "Unauthorized access", Code: http.StatusUnauthorized})
-		return
-	}
-
-	result, err := service.GetPendingEmployers()
+	result, err := service.GetPendingEmployers(c)
 	if err != nil {
 		response.Response(c, err)
 		return
