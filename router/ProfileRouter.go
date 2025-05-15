@@ -16,5 +16,6 @@ func ProfileRouter(routerGroup *gin.RouterGroup) {
 		// API công khai không yêu cầu đăng nhập
 		profileGroup.GET("/jobseeker/:id", controller.GetJobseekerPublicProfile)
 		profileGroup.GET("/employer/:id", controller.GetEmployerPublicProfile)
+		profileGroup.PUT("/delete-profile", controller.DeleteProfile)
 	}
 }

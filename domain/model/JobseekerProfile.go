@@ -29,4 +29,6 @@ type JobseekerProfile struct {
 	LinkedinProfile string         `json:"linkedin_profile"`
 	GithubProfile   string         `json:"github_profile"`
 	WebsiteURL      string         `json:"website_url"`
+	FistName        string         `json:"first_name"`
+	LastName        string         `json:"last_name"`
 }

@@ -3,6 +3,7 @@ package repository
 import (
 	"datn_backend/config"
 	m "datn_backend/domain/model"
+	"datn_backend/message"
 	"datn_backend/middleware"
 	"fmt"
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ import (
 func GetJobseekerProfileByUserID(userID *uint) (*m.JobseekerProfile, error) {
 	var profile m.JobseekerProfile
 	db := config.DB
-	result := db.Where("user_id = ?", userID).First(&profile)
+	result := db.Preload("User").Where("user_id = ?", userID).First(&profile)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -27,7 +28,7 @@ func GetJobseekerProfileByUserID(userID *uint) (*m.JobseekerProfile, error) {
 func GetEmployerProfileByUserID(userID *uint) (*m.EmployerProfile, error) {
 	var profile m.EmployerProfile
 	db := config.DB
-	result := db.Where("user_id = ?", userID).First(&profile)
+	result := db.Preload("User").Where("user_id = ?", userID).First(&profile)
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -278,15 +279,15 @@ func UpdateProfilePhoto(userID uint, photoType string, photoURL string) error {
 	}
 
 	// Update the appropriate profile based on user type and photo type
-	if userType == "jobseeker" {
+	if userType == config.USER_TYPE_JOBSEEKER {
 		var profile m.JobseekerProfile
 		if err := tx.Where("user_id = ?", userID).First(&profile).Error; err != nil {
 			// If profile doesn't exist, create it
 			if err == gorm.ErrRecordNotFound {
 				profile = m.JobseekerProfile{UserID: userID}
-				if photoType == "profile_picture" {
+				if photoType == config.PROFILE_PHOTO {
 					profile.ProfilePicture = photoURL
-				} else if photoType == "resume" {
+				} else if photoType == config.RESUME {
 					profile.ResumeURL = photoURL
 				}
 				if err := tx.Create(&profile).Error; err != nil {
@@ -299,9 +300,9 @@ func UpdateProfilePhoto(userID uint, photoType string, photoURL string) error {
 			}
 		} else {
 			// Update existing profile
-			if photoType == "profile_picture" {
+			if photoType == config.PROFILE_PHOTO {
 				profile.ProfilePicture = photoURL
-			} else if photoType == "resume" {
+			} else if photoType == config.RESUME {
 				profile.ResumeURL = photoURL
 			}
 			if err := tx.Save(&profile).Error; err != nil {
@@ -309,15 +310,15 @@ func UpdateProfilePhoto(userID uint, photoType string, photoURL string) error {
 				return err
 			}
 		}
-	} else if userType == "employer" {
+	} else if userType == config.USER_TYPE_EMPLOYER {
 		var profile m.EmployerProfile
 		if err := tx.Where("user_id = ?", userID).First(&profile).Error; err != nil {
 			// If profile doesn't exist, create it
 			if err == gorm.ErrRecordNotFound {
 				profile = m.EmployerProfile{UserID: userID}
-				if photoType == "company_logo" {
+				if photoType == config.COMPANY_LOGO {
 					profile.CompanyLogo = photoURL
-				} else if photoType == "company_banner" {
+				} else if photoType == config.COMPANY_COVER {
 					profile.CompanyBanner = photoURL
 				}
 				if err := tx.Create(&profile).Error; err != nil {
@@ -330,9 +331,9 @@ func UpdateProfilePhoto(userID uint, photoType string, photoURL string) error {
 			}
 		} else {
 			// Update existing profile
-			if photoType == "company_logo" {
+			if photoType == config.COMPANY_LOGO {
 				profile.CompanyLogo = photoURL
-			} else if photoType == "company_banner" {
+			} else if photoType == config.COMPANY_COVER {
 				profile.CompanyBanner = photoURL
 			}
 			if err := tx.Save(&profile).Error; err != nil {
@@ -412,4 +413,46 @@ func UpsertEmployerProfile(profile *m.EmployerProfile) error {
 	}
 
 	return tx.Commit().Error
+}
+func DeleteProfile(db *gorm.DB, u uint) (interface{}, interface{}) {
+	now := time.Now()
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table(`datn_backend."user"`).
+			Where("id = ?", u).
+			Updates(map[string]interface{}{
+				"is_deleted": true,
+				"updated_at": now,
+			}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Table(`datn_backend."user_provider"`).
+			//Where("user_id = ? AND user_type = ?", u, config.USER_TYPE_MOBILE).
+			Where("user_id = ? AND user_type = ?", u).
+			Update("is_deleted", true).Error; err != nil {
+			return err
+		}
+		//if err := tx.Table(`datn_backend."jobseeker_profile"`).
+		//	Where("user_id = ?", u).
+		//	Update("is_deleted", true).Error; err != nil {
+		//	return err
+		//}
+		return nil
+	})
+	if err != nil {
+		middleware.Log(err)
+		return nil, message.ExcuteDatabaseError
+	}
+	return nil, nil
+}
+
+// GetUserById lấy thông tin người dùng theo ID
+func GetUserById(db *gorm.DB, userID uint) (*m.User, error) {
+	var user m.User
+	result := db.First(&user, userID)
+	if result.Error != nil {
+		middleware.Log(fmt.Errorf("Failed to get user by ID: %v", result.Error))
+		return nil, result.Error
+	}
+	return &user, nil
 }

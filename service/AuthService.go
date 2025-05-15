@@ -20,7 +20,7 @@ import (
 
 func Login(c *gin.Context, userLogin *payload.UserLogin, deviceId string) (*response.UserToken, interface{}) {
 	// Normalize email
-	email := strings.ToLower(strings.TrimSpace(userLogin.Username))
+	email := strings.ToLower(strings.TrimSpace(userLogin.Email))
 
 	// Log login attempt
 	middleware.Log(fmt.Sprintf("Login attempt for email: %s, device: %s", email, deviceId))
@@ -42,13 +42,46 @@ func Login(c *gin.Context, userLogin *payload.UserLogin, deviceId string) (*resp
 		middleware.Log(fmt.Sprintf("Login failed: Account locked: %s", email))
 		return nil, message.UserHasBeenLocked
 	}
-	provider := repo.GetUserProvider(user)
+	if user.IsSupper == false {
+
+		provider, errGet := repo.GetUserProvider(user)
+		if errGet != nil {
+			return nil, message.UserNotFound
+		}
+
+		// Check if employer account is approved
+		if provider.UserType == config.USER_TYPE_EMPLOYER && !provider.IsApproved {
+			middleware.Log(fmt.Sprintf("Login failed: Employer account not approved yet: %s", email))
+			return nil, message.ApprovalAccountPenning
+		}
+
+		verify, _, err := utils.VerifyPassword(userLogin.Password, user.Password)
+		if !verify || err != nil {
+			middleware.Log(fmt.Sprintf("Login failed: Incorrect password for email: %s", email))
+			return nil, message.PasswordNotCorrect
+		}
+
+		token, tokenErr := CreateToken(c, &user, provider.UserType, deviceId)
+		if tokenErr != nil {
+			middleware.Log(fmt.Errorf("Failed to create token for user %s: %v", email, tokenErr))
+			return nil, tokenErr
+		}
+
+		// Log successful login
+		middleware.Log(fmt.Sprintf("Login successful for user: %s (ID: %d, Type: %s)", email, user.ID, provider.UserType))
+
+		return token, nil
+	}
+	//provider, errGet := repo.GetUserProvider(user)
+	//if errGet != nil {
+	//	return nil, message.UserNotFound
+	//}
 
 	// Check if employer account is approved
-	if provider.UserType == config.USER_TYPE_EMPLOYER && !provider.IsApproved {
-		middleware.Log(fmt.Sprintf("Login failed: Employer account not approved yet: %s", email))
-		return nil, message.ApprovalAccountPenning
-	}
+	//if provider.UserType == config.USER_TYPE_EMPLOYER && !provider.IsApproved {
+	//	middleware.Log(fmt.Sprintf("Login failed: Employer account not approved yet: %s", email))
+	//	return nil, message.ApprovalAccountPenning
+	//}
 
 	verify, _, err := utils.VerifyPassword(userLogin.Password, user.Password)
 	if !verify || err != nil {
@@ -56,14 +89,14 @@ func Login(c *gin.Context, userLogin *payload.UserLogin, deviceId string) (*resp
 		return nil, message.PasswordNotCorrect
 	}
 
-	token, tokenErr := CreateToken(c, &user, provider.UserType, deviceId)
+	token, tokenErr := CreateToken(c, &user, "ADMIN", deviceId)
 	if tokenErr != nil {
 		middleware.Log(fmt.Errorf("Failed to create token for user %s: %v", email, tokenErr))
 		return nil, tokenErr
 	}
 
 	// Log successful login
-	middleware.Log(fmt.Sprintf("Login successful for user: %s (ID: %d, Type: %s)", email, user.ID, provider.UserType))
+	middleware.Log(fmt.Sprintf("Login successful for user: %s (ID: %d, Type: %s)", email, user.ID, "Admin"))
 
 	return token, nil
 }
@@ -298,4 +331,22 @@ func GetPendingEmployers(c *gin.Context) (interface{}, interface{}) {
 		"pending_employers": employers,
 		"count":             len(employers),
 	}, nil
+}
+
+func delRedisByPattern(c *gin.Context, pattern string) error {
+	luaScript := `
+	local keys = redis.call('KEYS', ARGV[1])
+	for i=1,#keys,5000 do
+		redis.call('DEL', unpack(keys, i, math.min(i+4999, #keys)))
+	end
+	return #keys
+	`
+	deletedKeys, err := config.RedisClient.Eval(c, luaScript, []string{}, pattern).Result()
+	if err != nil {
+		fmt.Errorf("Error running Lua script: %v", err)
+		return err
+	}
+
+	fmt.Printf("Deleted %v keys matching pattern '%s'\n", deletedKeys, pattern)
+	return nil
 }

@@ -7,18 +7,6 @@ import (
 	"fmt"
 )
 
-// GetUserById lấy thông tin người dùng theo ID
-func GetUserById(userID uint) (*model.User, error) {
-	var user model.User
-	db := config.DB
-	result := db.First(&user, userID)
-	if result.Error != nil {
-		middleware.Log(fmt.Errorf("Failed to get user by ID: %v", result.Error))
-		return nil, result.Error
-	}
-	return &user, nil
-}
-
 // GetUserType lấy loại người dùng (jobseeker hoặc employer) dựa trên ID
 func GetUserType(userID uint) (string, error) {
 	var user model.User

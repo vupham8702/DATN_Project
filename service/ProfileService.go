@@ -327,3 +327,17 @@ func isEmployerProfileComplete(profile *model.EmployerProfile) bool {
 		profile.TaxCode != "" &&
 		profile.ContactPersonName != ""
 }
+
+func DeleteProfile(db *gorm.DB, uid uint, c *gin.Context) (interface{}, interface{}) {
+	_, err := repo.GetUserById(db, uid)
+	if err != nil {
+		return nil, err
+	}
+	userDelete, errDelete := repo.DeleteProfile(db, uid)
+	pattern := fmt.Sprintf("%s:%d:%s", config.TOKEN, uid, "*")
+	delRedisByPattern(c, pattern)
+	if errDelete != nil {
+		return nil, errDelete
+	}
+	return userDelete, nil
+}

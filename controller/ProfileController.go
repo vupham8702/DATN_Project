@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"datn_backend/config"
 	repo "datn_backend/domain/repository"
 	"datn_backend/message"
 	"datn_backend/middleware"
@@ -234,4 +235,46 @@ func GetEmployerPublicProfile(c *gin.Context) {
 	}
 
 	response.Response(c, result, message.Success)
+}
+
+// DeleteProfile godoc
+// @Summary Delete Profile
+// @Description Xóa thông tin hồ sơ
+// @Tags ProfileController
+// @Accept json
+// @Produce json
+// @Param profile body request.DeleteProfileRequest true "Xóa hồ sơ"
+// @Success 200 {object} response.VResponse
+// @Router /datn_backend/profile/delete [put]
+// @Security BearerAuth
+func DeleteProfile(c *gin.Context) {
+	var deleteProfileReq request.DeleteProfileRequest
+	if err := c.ShouldBindJSON(&deleteProfileReq); err != nil {
+		middleware.Log(err)
+		response.Response(c, message.ValidationError, http.StatusBadRequest)
+		return
+	}
+
+	isSupper, errSuper := utils.GetFieldInToken(c, "issupper")
+	if errSuper != nil {
+		response.Response(c, message.InternalServerError)
+		return
+	}
+	uid, errGet := utils.GetUidByClaim(c)
+	if errGet != nil {
+		response.Response(c, errGet)
+		return
+	}
+	if *isSupper == "true" || *uid == deleteProfileReq.UserId {
+		obj, errDelete := service.DeleteProfile(config.DB, deleteProfileReq.UserId, c)
+		if errDelete != nil {
+			middleware.Log(errDelete)
+			response.Response(c, errDelete)
+			return
+		}
+		response.Response(c, message.Success, obj)
+		return
+	}
+	response.Response(c, message.ForbidenError)
+	return
 }
