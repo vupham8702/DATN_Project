@@ -23,6 +23,13 @@ var (
 	TooManyRequests     = Message{Code: 429, Message: "Quá nhiều yêu cầu. Vui lòng thử lại sau."}
 	RoleNotFound        = Message{Code: 400, Message: "Vai trò không tồn tại!"}
 	ForbidenError       = Message{Code: 403, Message: "Bạn không có quyền thực hiện thao tác này"}
+	PostNotFound        = Message{Code: 404, Message: "Không tìm thấy bài đăng tuyển dụng!"}
+	ProfileNotFound     = Message{Code: 404, Message: "Không tìm thấy thông tin hồ sơ!"}
+
+	// CV messages
+	CVTemplateNotFound = Message{Code: 404, Message: "Không tìm thấy mẫu CV!"}
+	CVNotFound         = Message{Code: 404, Message: "Không tìm thấy CV!"}
+
 	// Registration messages
 	EmailAlreadyExists     = Message{Code: 400, Message: "Email này đã được đăng ký"}
 	RegistrationSuccess    = Message{Code: 200, Message: "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản."}

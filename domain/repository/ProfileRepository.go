@@ -447,7 +447,17 @@ func DeleteProfile(db *gorm.DB, u uint) (interface{}, interface{}) {
 }
 
 // GetUserById lấy thông tin người dùng theo ID
-func GetUserById(db *gorm.DB, userID uint) (*m.User, error) {
+func GetUserById(userID uint) (*m.User, error) {
+	var user m.User
+	db := config.DB
+	result := db.First(&user, userID)
+	if result.Error != nil {
+		middleware.Log(fmt.Errorf("Failed to get user by ID: %v", result.Error))
+		return nil, result.Error
+	}
+	return &user, nil
+}
+func FindUserById(db *gorm.DB, userID uint) (*m.User, error) {
 	var user m.User
 	result := db.First(&user, userID)
 	if result.Error != nil {

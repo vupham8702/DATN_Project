@@ -329,7 +329,7 @@ func isEmployerProfileComplete(profile *model.EmployerProfile) bool {
 }
 
 func DeleteProfile(db *gorm.DB, uid uint, c *gin.Context) (interface{}, interface{}) {
-	_, err := repo.GetUserById(db, uid)
+	_, err := repo.FindUserById(db, uid)
 	if err != nil {
 		return nil, err
 	}

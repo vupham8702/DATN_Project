@@ -92,13 +92,21 @@ func CreateUser(user *m.User, userType string) error {
 	return nil
 }
 
-func GetUserProvider(user m.User) m.UserProvider {
+func GetUserProvider(user m.User) (m.UserProvider, error) {
 	db := config.DB
-	query := db.Select("*").Where("user_id = ?", user.ID).Find(&[]m.UserProvider{})
-	if query.Error != nil {
-		panic(query.Error)
+	var userProvider m.UserProvider
+
+	result := db.Where("user_id = ? and is_deleted = false", user.ID).First(&userProvider)
+
+	if result.Error != nil {
+		return m.UserProvider{}, result.Error
 	}
-	return m.UserProvider{}
+
+	if result.RowsAffected == 0 {
+		return m.UserProvider{}, fmt.Errorf("user provider not found for user ID %d", user.ID)
+	}
+
+	return userProvider, nil
 }
 
 // UpdateUserProviderApprovalStatus updates the approval status of a user provider
